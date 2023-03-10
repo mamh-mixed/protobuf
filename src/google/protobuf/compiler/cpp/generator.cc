@@ -379,6 +379,20 @@ absl::Status CppGenerator::ValidateFeatures(const FileDescriptor* file) const {
           absl::StrCat("Field ", field.full_name(),
                        " has a closed enum type with implicit presence."));
     }
+    if (field.options().has_ctype()) {
+      if (field.cpp_type() != FieldDescriptor::CPPTYPE_STRING) {
+        status = absl::FailedPreconditionError(absl::StrCat(
+            "Field ", field.full_name(),
+            " specifies cord, but is not a string nor bytes field."));
+      }
+      if (field.options().ctype() == FieldOptions::CORD) {
+        if (field.is_extension()) {
+          status = absl::FailedPreconditionError(absl::StrCat(
+              "Extension ", field.full_name(),
+              " specifies ctype=CORD which is not supported for extensions."));
+        }
+      }
+    }
   });
   return status;
 }
