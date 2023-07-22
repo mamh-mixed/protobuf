@@ -640,11 +640,9 @@ bool MessageDifferencer::Compare(const Message& message1,
     std::unique_ptr<Message> data2;
     if (unpack_any_field_.UnpackAny(message1, &data1) &&
         unpack_any_field_.UnpackAny(message2, &data2)) {
-      // Avoid DFATAL for different descriptors in google.protobuf.Any payloads.
-      if (data1->GetDescriptor() != data2->GetDescriptor()) {
-        return false;
+      if (data1->GetDescriptor() == data2->GetDescriptor()) {
+        return Compare(*data1, *data2, unpacked_any + 1, parent_fields);
       }
-      return Compare(*data1, *data2, unpacked_any + 1, parent_fields);
     }
   }
 
