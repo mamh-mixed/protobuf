@@ -260,6 +260,7 @@ inline bool CppFeatures::has_legacy_closed_enum() const {
   return value;
 }
 inline void CppFeatures::clear_legacy_closed_enum() {
+  PROTOBUF_TSAN_WRITE(&_impl_._tsan_detect_race);
   _impl_.legacy_closed_enum_ = false;
   _impl_._has_bits_[0] &= ~0x00000001u;
 }

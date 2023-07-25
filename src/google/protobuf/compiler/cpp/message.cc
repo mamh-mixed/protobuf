@@ -1106,6 +1106,7 @@ void MessageGenerator::GenerateFieldClear(const FieldDescriptor* field,
             }}},
           R"cc(
             $inline $void $classname$::clear_$name$() {
+              PROTOBUF_TSAN_WRITE(&_impl_._tsan_detect_race);
               $body$;
               $annotate_clear$;
             }
@@ -2976,6 +2977,8 @@ void MessageGenerator::GenerateClear(io::Printer* p) {
       "// @@protoc_insertion_point(message_clear_start:$full_name$)\n");
   format.Indent();
 
+  format("PROTOBUF_TSAN_WRITE(&_impl_._tsan_detect_race);\n");
+
   format(
       // TODO(jwb): It would be better to avoid emitting this if it is not used,
       // rather than emitting a workaround for the resulting warning.
@@ -3176,6 +3179,7 @@ void MessageGenerator::GenerateOneofClear(io::Printer* p) {
         "void $classname$::clear_$oneofname$() {\n"
         "// @@protoc_insertion_point(one_of_clear_start:$full_name$)\n");
     format.Indent();
+    format("PROTOBUF_TSAN_WRITE(&_impl_._tsan_detect_race);\n");
     format("switch ($oneofname$_case()) {\n");
     format.Indent();
     for (auto field : FieldRange(oneof)) {
