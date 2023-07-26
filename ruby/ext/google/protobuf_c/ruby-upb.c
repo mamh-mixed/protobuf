@@ -7703,14 +7703,16 @@ static void _upb_FieldDef_Create(upb_DefBuilder* ctx, const char* prefix,
               f->full_name, (int)f->type_);
         }
     }
-  } else if (has_type_name) {
-    f->type_ =
-        UPB_FIELD_TYPE_UNSPECIFIED;  // We'll assign this in resolve_fielddef()
   }
 
-  if (f->type_ < kUpb_FieldType_Double || f->type_ > kUpb_FieldType_SInt64) {
-    _upb_DefBuilder_Errf(ctx, "invalid type for field %s (%d)", f->full_name,
-                         f->type_);
+  if (!has_type && has_type_name) {
+    f->type_ =
+        UPB_FIELD_TYPE_UNSPECIFIED;  // We'll assign this in resolve_subdef()
+  } else {
+    if (f->type_ < kUpb_FieldType_Double || f->type_ > kUpb_FieldType_SInt64) {
+      _upb_DefBuilder_Errf(ctx, "invalid type for field %s (%d)", f->full_name,
+                           f->type_);
+    }
   }
 
   if (f->label_ < kUpb_Label_Optional || f->label_ > kUpb_Label_Repeated) {
@@ -7759,14 +7761,15 @@ static void _upb_FieldDef_Create(upb_DefBuilder* ctx, const char* prefix,
     f->is_packed = UPB_DESC(FieldOptions_packed)(f->opts);
   } else {
     // Repeated fields default to packed for proto3 only.
-    f->is_packed = upb_FieldDef_IsPrimitive(f) &&
+    f->is_packed = has_type && upb_FieldDef_IsPrimitive(f) &&
                    f->label_ == kUpb_Label_Repeated &&
                    upb_FileDef_Syntax(f->file) == kUpb_Syntax_Proto3;
   }
 
   f->has_presence =
       (!upb_FieldDef_IsRepeated(f)) &&
-      (upb_FieldDef_IsSubMessage(f) || upb_FieldDef_ContainingOneof(f) ||
+      (f->type_ == kUpb_FieldType_Message || f->type_ == kUpb_FieldType_Group ||
+       upb_FieldDef_ContainingOneof(f) ||
        (upb_FileDef_Syntax(f->file) == kUpb_Syntax_Proto2));
 }
 
@@ -7874,16 +7877,22 @@ static void resolve_subdef(upb_DefBuilder* ctx, const char* prefix,
         case UPB_DEFTYPE_ENUM:
           f->sub.enumdef = def;
           f->type_ = kUpb_FieldType_Enum;
+          if (!UPB_DESC(FieldOptions_has_packed)(f->opts)) {
+            f->is_packed = f->label_ == kUpb_Label_Repeated &&
+                           upb_FileDef_Syntax(f->file) == kUpb_Syntax_Proto3;
+          }
           break;
         case UPB_DEFTYPE_MSG:
           f->sub.msgdef = def;
           f->type_ = kUpb_FieldType_Message;  // It appears there is no way of
                                               // this being a group.
+          f->has_presence = !upb_FieldDef_IsRepeated(f);
           break;
         default:
           _upb_DefBuilder_Errf(ctx, "Couldn't resolve type name for field %s",
                                f->full_name);
       }
+      break;
     }
     case kUpb_FieldType_Message:
     case kUpb_FieldType_Group:
@@ -14018,7 +14027,7 @@ bool upb_MiniTable_Link(upb_MiniTable* mt, const upb_MiniTable** sub_tables,
 
   for (int i = 0; i < mt->field_count; i++) {
     upb_MiniTableField* f = (upb_MiniTableField*)&mt->fields[i];
-    if (upb_MiniTableField_CType(f) == kUpb_CType_Enum) {
+    if (upb_MiniTableField_IsClosedEnum(f)) {
       const upb_MiniTableEnum* sub = sub_enums[enum_count++];
       if (enum_count > sub_enum_count) return false;
       if (sub != NULL) {
