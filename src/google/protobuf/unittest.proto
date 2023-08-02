@@ -424,6 +424,11 @@ message TestNestedChildExtensionData {
   optional TestChildExtensionData child = 2;
 }
 
+message TestRequiredEnum {
+  required ForeignEnum required_enum = 1;
+  optional int32 a = 2;
+}
+
 // We have separate messages for testing required fields because it's
 // annoying to have to fill in required fields in TestProto in order to
 // do anything with it.  Note that we don't need to test every type of
@@ -496,6 +501,7 @@ message TestNestedRequiredForeign {
   optional TestNestedRequiredForeign child = 1;
   optional TestRequiredForeign payload = 2;
   optional int32 dummy = 3;
+  optional TestRequiredEnum required_enum = 5;
 }
 
 // Test that we can use NestedMessage from outside TestAllTypes.
