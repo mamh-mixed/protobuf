@@ -226,12 +226,16 @@ fn test_optional_bytes_accessors() {
     assert_eq!(msg.optional_bytes().unwrap(), b"");
 }
 
+use std::any::type_name;
+fn type_of<'a, T>(_: T) -> &'a str {
+    type_name::<T>()
+}
+
 #[test]
-#[should_panic = "b/285309454"]
-#[allow(unreachable_code)]
 fn test_singular_msg_field() {
     let msg = TestAllTypes::new();
     // TODO("b/285309454"): fetch the inner integer `bb`
     // call should look like msg.optional_nested_message().bb()
-    match msg.optional_nested_message() {}
+    let deduced_type = type_of(msg.optional_nested_message());
+    assert_eq!(deduced_type, "unittest_proto::proto2_unittest::TestAllTypesView");
 }
