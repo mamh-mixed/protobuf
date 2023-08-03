@@ -48,6 +48,7 @@
 #include "absl/strings/str_cat.h"
 #include "google/protobuf/compiler/cpp/helpers.h"
 #include "google/protobuf/compiler/cpp/names.h"
+#include "google/protobuf/generated_enum_util.h"
 
 namespace google {
 namespace protobuf {
@@ -180,6 +181,7 @@ void EnumGenerator::GenerateDefinition(io::Printer* p) {
         };
 
         $dllexport_decl $bool $Msg_Enum$_IsValid(int value);
+        $dllexport_decl $extern const uint32_t $Msg_Enum$_internal_data_[];
         constexpr $Msg_Enum$ $Msg_Enum_Enum_MIN$ = static_cast<$Msg_Enum$>($kMin$);
         constexpr $Msg_Enum$ $Msg_Enum_Enum_MAX$ = static_cast<$Msg_Enum$>($kMax$);
       )cc");
@@ -365,39 +367,47 @@ void EnumGenerator::GenerateMethods(int idx, io::Printer* p) {
     )cc");
   }
 
-  p->Emit({{"cases",
+  // Multiple values may have the same number. Sort and dedup.
+  std::vector<int> numbers;
+  numbers.reserve(enum_->value_count());
+  for (int i = 0; i < enum_->value_count(); ++i) {
+    numbers.push_back(enum_->value(i)->number());
+  }
+  // Sort and deduplicate `numbers`.
+  absl::c_sort(numbers);
+  numbers.erase(std::unique(numbers.begin(), numbers.end()), numbers.end());
+
+  // Always generate the data array, even on the simple cases because someone
+  // might be using it for TDP entries. If it is not used in the end, the linker
+  // will drop it.
+  p->Emit({{"encoded",
             [&] {
-              // Multiple values may have the same number.  Make sure we only
-              // cover each number once by first constructing a set containing
-              // all valid numbers, then printing a case statement for each
-              // element.
-
-              std::vector<int> numbers;
-              numbers.reserve(enum_->value_count());
-              for (int i = 0; i < enum_->value_count(); ++i) {
-                numbers.push_back(enum_->value(i)->number());
-              }
-              // Sort and deduplicate `numbers`.
-              absl::c_sort(numbers);
-              numbers.erase(std::unique(numbers.begin(), numbers.end()),
-                            numbers.end());
-
-              for (int n : numbers) {
-                p->Emit({{"n", n}}, R"cc(
-                  case $n$:
-                )cc");
+              for (uint32_t n : google::protobuf::internal::GenerateEnumData(numbers)) {
+                p->Emit({{"n", n}}, "$n$u, ");
               }
             }}},
-          R"(
-            bool $Msg_Enum$_IsValid(int value) {
-              switch (value) {
-                $cases$;
-                  return true;
-                default:
-                  return false;
+          R"cc(
+            PROTOBUF_CONSTINIT const uint32_t $Msg_Enum$_internal_data_[] = {
+                $encoded$};
+          )cc");
+  if (numbers.front() + static_cast<int32_t>(numbers.size()) - 1 ==
+      numbers.back()) {
+    // They are sequential. Simplify code by having a simple range check.
+    p->Emit({{"min", numbers.front()}, {"max", numbers.back()}},
+            R"cc(
+              bool $Msg_Enum$_IsValid(int value) {
+                return $min$ <= value && value <= $max$;
               }
-            }
-          )");
+            )cc");
+  } else {
+    // More complex struct. Use enum data structure for lookup.
+    p->Emit(
+        R"cc(
+          bool $Msg_Enum$_IsValid(int value) {
+            return ::_pbi::ValidateEnumInlined(value, $Msg_Enum$_internal_data_);
+          }
+        )cc");
+  }
 
   if (!has_reflection_) {
     // In lite mode (where descriptors are unavailable), we generate separate

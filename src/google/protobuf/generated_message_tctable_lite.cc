@@ -801,7 +801,7 @@ bool EnumIsValidAux(int32_t val, uint16_t xform_val,
     auto lo = aux.enum_range.start;
     return lo <= val && val < (lo + aux.enum_range.length);
   }
-  return aux.enum_validator(val);
+  return internal::ValidateEnumInlined(val, aux.enum_data);
 }
 
 }  // namespace
@@ -2776,7 +2776,7 @@ PROTOBUF_NOINLINE const char* TcParser::MpMap(PROTOBUF_TC_PARAM_DECL) {
   // `aux[0]` points into a MapAuxInfo.
   // If we have a message mapped_type aux[1] points into a `create_in_arena`.
   // If we have a validated enum mapped_type aux[1] point into a
-  // `enum_validator`.
+  // `enum_data`.
   const auto* aux = table->field_aux(&entry);
   const auto map_info = aux[0].map_info;
 
@@ -2811,10 +2811,11 @@ PROTOBUF_NOINLINE const char* TcParser::MpMap(PROTOBUF_TC_PARAM_DECL) {
     });
 
     if (PROTOBUF_PREDICT_TRUE(ptr != nullptr)) {
-      if (PROTOBUF_PREDICT_FALSE(
-              map_info.value_is_validated_enum &&
-              !aux[1].enum_validator(*static_cast<int32_t*>(
-                  node->GetVoidValue(map_info.node_size_info))))) {
+      if (PROTOBUF_PREDICT_FALSE(map_info.value_is_validated_enum &&
+                                 !internal::ValidateEnumInlined(
+                                     *static_cast<int32_t*>(node->GetVoidValue(
+                                         map_info.node_size_info)),
+                                     aux[1].enum_data))) {
         WriteMapEntryAsUnknown(msg, table, saved_tag, node, map_info);
       } else {
         // Done parsing the node, try to insert it.
