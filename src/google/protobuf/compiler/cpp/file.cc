@@ -37,6 +37,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <queue>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,6 +47,7 @@
 #include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/absl_check.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -111,6 +113,96 @@ void UnmuteWuninitialized(io::Printer* p) {
 
 }  // namespace
 
+static std::vector<const Descriptor*> TopologicalSortMessagesInFile(
+    const FileDescriptor* file, MessageSCCAnalyzer& scc_analyzer) {
+  // Collect the messages defined in this file.
+  std::vector<const Descriptor*> messages_in_file = FlattenMessagesInFile(file);
+  if (messages_in_file.empty()) return {};
+  // Populate the map from the descriptor to the SCC to which the descriptor
+  // belongs.
+  absl::flat_hash_map<const Descriptor*, const SCC*> descriptor_scc_pairs;
+  descriptor_scc_pairs.reserve(messages_in_file.size());
+  for (const Descriptor* d : messages_in_file) {
+    descriptor_scc_pairs.emplace(d, scc_analyzer.GetSCC(d));
+  }
+  ABSL_RAW_CHECK(messages_in_file.size() == descriptor_scc_pairs.size(), "");
+  // Each SCC has information about the children SCC i.e. SCCs for fields that
+  // are contained in the protos that belong to this SCC.  Use this information
+  // to construct the inverse map from children SCC to parent SCC.
+  absl::flat_hash_map<const SCC*, absl::flat_hash_set<const SCC*>>
+      child_to_parent_scc_map;
+  // For recording the number of edges from each SCC to other SCCs in the
+  // forward map.
+  absl::flat_hash_map<const SCC*, int> scc_to_outgoing_edges_map;
+  std::queue<const SCC*> sccs_to_process;
+  for (const auto& p : descriptor_scc_pairs) {
+    sccs_to_process.push(p.second);
+  }
+  // Run a BFS to fill the two data structures.
+  while (!sccs_to_process.empty()) {
+    const SCC* scc = sccs_to_process.front();
+    sccs_to_process.pop();
+    if (!scc_to_outgoing_edges_map.contains(scc)) {
+      scc_to_outgoing_edges_map[scc] = 0;
+    }
+    for (const auto& child : scc->children) {
+      // Test whether this child has been seen thus far.  We do not know if the
+      // children SCC vector contains unique children SCC.
+      auto it = child_to_parent_scc_map.find(child);
+      if (it == child_to_parent_scc_map.end()) {
+        auto ret = child_to_parent_scc_map.emplace(
+            child, absl::flat_hash_set<const SCC*>());
+        it = ret.first;
+        ABSL_RAW_CHECK(ret.second, "");
+        sccs_to_process.push(child);
+      }
+      auto ret = it->second.emplace(scc);
+      if (ret.second) {
+        scc_to_outgoing_edges_map[scc]++;
+      }
+    }
+  }
+  // CheckCycle(child_to_parent_scc_map);
+  std::queue<const SCC*> sccq;
+  // Find out the SCCs that do not have an outgoing edge i.e. the protos in this
+  // SCC do not depend on protos other than the ones in this SCC.
+  for (const auto& p : scc_to_outgoing_edges_map) {
+    if (p.second == 0) {
+      sccq.push(p.first);
+    }
+  }
+  ABSL_RAW_CHECK(!sccq.empty(), "");
+  // Topologically sort the SCCs.
+  // If an SCC no longer has an outgoing edge i.e. all the SCCs it depends on
+  // have been ordered, then this SCC is now a candidate for ordering.
+  std::vector<const Descriptor*> order;
+  while (!sccq.empty()) {
+    const SCC* scc = sccq.front();
+    sccq.pop();
+    for (const Descriptor* d : scc->descriptors) {
+      // Only push messages that are defined in the file.
+      if (descriptor_scc_pairs.contains(d)) {
+        order.push_back(d);
+      }
+    }
+    const auto& parents = child_to_parent_scc_map.find(scc);
+    if (parents == child_to_parent_scc_map.end()) continue;
+    for (const SCC* parent : parents->second) {
+      auto it = scc_to_outgoing_edges_map.find(parent);
+      ABSL_RAW_CHECK(it != scc_to_outgoing_edges_map.end(), "");
+      ABSL_RAW_CHECK(it->second > 0, "");
+      it->second--;
+      if (it->second == 0) {
+        sccq.push(parent);
+      }
+    }
+  }
+  for (const auto& p : scc_to_outgoing_edges_map) {
+    ABSL_RAW_CHECK(p.second == 0, "");
+  }
+  return order;
+}
+
 bool FileGenerator::ShouldSkipDependencyImports(
     const FileDescriptor* dep) const {
   // Do not import weak deps.
@@ -131,12 +223,29 @@ bool FileGenerator::ShouldSkipDependencyImports(
 FileGenerator::FileGenerator(const FileDescriptor* file, const Options& options)
     : file_(file), options_(options), scc_analyzer_(options) {
   std::vector<const Descriptor*> msgs = FlattenMessagesInFile(file);
+  std::vector<const Descriptor*> msgs_topologically_ordered =
+      TopologicalSortMessagesInFile(file, scc_analyzer_);
+  ABSL_RAW_CHECK(msgs_topologically_ordered.size() == msgs.size(),
+                 "Size mismatch");
 
   for (int i = 0; i < msgs.size(); ++i) {
     message_generators_.push_back(std::make_unique<MessageGenerator>(
         msgs[i], variables_, i, options, &scc_analyzer_));
     message_generators_.back()->AddGenerators(&enum_generators_,
                                               &extension_generators_);
+  }
+  absl::flat_hash_map<const Descriptor*, int> msg_to_index;
+  for (int i = 0; i < msgs.size(); ++i) {
+    msg_to_index[msgs[i]] = i;
+  }
+  for (int i = 0; i < msgs.size(); ++i) {
+    if (msgs_topologically_ordered.empty()) {
+      message_generators_topologically_ordered_.push_back(i);
+    } else {
+      auto it = msg_to_index.find(msgs_topologically_ordered[i]);
+      ABSL_RAW_CHECK(it != msg_to_index.end(), "");
+      message_generators_topologically_ordered_.push_back(it->second);
+    }
   }
 
   for (int i = 0; i < file->enum_type_count(); ++i) {
@@ -845,7 +954,8 @@ void FileGenerator::GenerateSource(io::Printer* p) {
   {
     NamespaceOpener ns(Namespace(file_, options_), p);
     for (int i = 0; i < message_generators_.size(); ++i) {
-      GenerateSourceDefaultInstance(i, p);
+      GenerateSourceDefaultInstance(
+          message_generators_topologically_ordered_[i], p);
     }
   }
 
@@ -1523,7 +1633,8 @@ void FileGenerator::GenerateMessageDefinitions(io::Printer* p) {
     p->Emit(R"cc(
       $hrule_thin$
     )cc");
-    message_generators_[i]->GenerateClassDefinition(p);
+    message_generators_[message_generators_topologically_ordered_[i]]
+        ->GenerateClassDefinition(p);
   }
 }
 

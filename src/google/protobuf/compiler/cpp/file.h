@@ -200,9 +200,10 @@ class FileGenerator {
   // TODO(b/245791219)
   absl::flat_hash_map<absl::string_view, std::string> variables_;
 
-  // Contains the post-order walk of all the messages (and child messages) in
-  // this file. If you need a pre-order walk just reverse iterate.
+  // Contains the post-order walk of all the messages (and nested messages)
+  // defined in this file. If you need a pre-order walk just reverse iterate.
   std::vector<std::unique_ptr<MessageGenerator>> message_generators_;
+  std::vector<int> message_generators_topologically_ordered_;
   std::vector<std::unique_ptr<EnumGenerator>> enum_generators_;
   std::vector<std::unique_ptr<ServiceGenerator>> service_generators_;
   std::vector<std::unique_ptr<ExtensionGenerator>> extension_generators_;
