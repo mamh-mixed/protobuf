@@ -1459,7 +1459,7 @@ bool GetBootstrapBasename(const Options& options, absl::string_view basename,
 
 bool IsBootstrapProto(const Options& options, const FileDescriptor* file) {
   std::string my_name = StripProto(file->name());
-  return GetBootstrapBasename(options, my_name, &my_name);
+  return options.bootstrap || GetBootstrapBasename(options, my_name, &my_name);
 }
 
 bool MaybeBootstrap(const Options& options, GeneratorContext* generator_context,
