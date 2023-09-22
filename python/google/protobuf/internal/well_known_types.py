@@ -229,7 +229,7 @@ class Timestamp(object):
     if tzinfo is None:
       return _EPOCH_DATETIME_NAIVE + delta
     else:
-      return _EPOCH_DATETIME_AWARE.astimezone(tzinfo) + delta
+      return (_EPOCH_DATETIME_AWARE + delta).astimezone(tzinfo)
 
   def FromDatetime(self, dt):
     """Converts datetime to Timestamp.

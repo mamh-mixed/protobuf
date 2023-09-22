@@ -279,6 +279,13 @@ class TimeUtilTest(TimeUtilTestBase):
         aware_datetime)
     self.assertEqual(tzinfo, aware_datetime.tzinfo)
 
+  def testTimestampRoundTrip(self):
+    tz = zoneinfo.ZoneInfo('America/Los_Angeles')
+    dt = datetime.datetime(2016, 6, 26, tzinfo=tz)
+    ts = timestamp_pb2.Timestamp()
+    ts.FromDatetime(dt)
+    self.assertEqual(dt, ts.ToDatetime(tzinfo=dt.tzinfo))
+
   def testTimedeltaConversion(self):
     message = duration_pb2.Duration()
     message.FromNanoseconds(1999999999)
