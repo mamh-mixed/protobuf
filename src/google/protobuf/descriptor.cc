@@ -11,6 +11,7 @@
 
 #include "google/protobuf/descriptor.h"
 
+#include <fcntl.h>
 #include <limits.h>
 
 #include <algorithm>
@@ -20,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
+#include <iostream>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -1932,7 +1934,6 @@ const SourceCodeInfo_Location* FileDescriptorTables::GetSourceLocation(
 
 // ===================================================================
 // DescriptorPool
-
 
 DescriptorPool::ErrorCollector::~ErrorCollector() = default;
 

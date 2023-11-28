@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 
 #include "absl/algorithm/container.h"
 #include "absl/base/attributes.h"
@@ -1173,6 +1174,7 @@ FieldOptions::OptionTargetType GetTargetType(const ServiceDescriptor*) {
 FieldOptions::OptionTargetType GetTargetType(const MethodDescriptor*) {
   return FieldOptions::TARGET_TYPE_METHOD;
 }
+
 }  // namespace
 
 int CommandLineInterface::Run(int argc, const char* const argv[]) {
