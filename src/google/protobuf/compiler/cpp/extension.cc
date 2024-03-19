@@ -180,24 +180,58 @@ void ExtensionGenerator::GenerateDefinition(io::Printer* p) {
 }
 
 bool ExtensionGenerator::WillGenerateRegistration(InitPriority priority) {
-  // We only use priority 101 for weak descriptors.
-  return priority != kInitPriority101 ||
-         (descriptor_->cpp_type() == descriptor_->CPPTYPE_MESSAGE &&
-          UsingImplicitWeakDescriptor(descriptor_->file(), options_));
+  // When not using weak descriptors we initialize everything on priority 102.
+  if (!UsingImplicitWeakDescriptor(descriptor_->file(), options_)) {
+    return priority == kInitPriority102;
+  }
+  return true;
 }
 
 void ExtensionGenerator::GenerateRegistration(io::Printer* p,
                                               InitPriority priority) {
   ABSL_CHECK(WillGenerateRegistration(priority));
+  const bool using_implicit_weak_descriptors =
+      UsingImplicitWeakDescriptor(descriptor_->file(), options_);
+  const auto find_index = [](auto* desc) {
+    const std::vector<const Descriptor*> msgs =
+        FlattenMessagesInFile(desc->file());
+    return absl::c_find(msgs, desc) - msgs.begin();
+  };
   auto vars = p->WithVars(variables_);
+  auto vars2 = p->WithVars({{
+      {"extendee_table",
+       DescriptorTableName(descriptor_->containing_type()->file(), options_)},
+      {"extendee_index", find_index(descriptor_->containing_type())},
+      {"preregister", priority == kInitPriority101},
+  }});
   switch (descriptor_->cpp_type()) {
     case FieldDescriptor::CPPTYPE_ENUM:
-      p->Emit({{"enum_name", ClassName(descriptor_->enum_type(), true)}},
-              R"cc(
-                ::_pbi::ExtensionSet::RegisterEnumExtension(
-                    &$extendee$::default_instance(), $number$, $field_type$,
-                    $repeated$, $packed$, $enum_name$_IsValid),
-              )cc");
+      if (using_implicit_weak_descriptors) {
+        p->Emit({{"enum_name", ClassName(descriptor_->enum_type(), true)}},
+                R"cc(
+                  //
+#if defined(PROTOBUF_INTERNAL_TEMPORARY_WEAK_EXTENSION_OPT_IN)
+                  ::_pbi::ExtensionSet::RegisterWeakEnumExtension(
+                      {&$extendee_table$, $extendee_index$}, $number$,
+                      $field_type$, $repeated$, $packed$, $enum_name$_IsValid,
+                      $preregister$),
+#else
+                )cc");
+      }
+      if (priority == kInitPriority102) {
+        p->Emit({{"enum_name", ClassName(descriptor_->enum_type(), true)}},
+                R"cc(
+                  ::_pbi::ExtensionSet::RegisterEnumExtension(
+                      &$extendee$::default_instance(), $number$, $field_type$,
+                      $repeated$, $packed$, $enum_name$_IsValid),
+                )cc");
+      }
+      if (using_implicit_weak_descriptors) {
+        p->Emit(R"cc(
+#endif
+        )cc");
+      }
+
       break;
     case FieldDescriptor::CPPTYPE_MESSAGE: {
       const bool should_verify =
@@ -215,40 +249,13 @@ void ExtensionGenerator::GenerateRegistration(io::Printer* p,
            {"lazy", descriptor_->options().has_lazy()
                         ? descriptor_->options().lazy() ? "kLazy" : "kEager"
                         : "kUndefined"}});
-      const auto register_message = [&] {
-        p->Emit(R"cc(
-          ::_pbi::ExtensionSet::RegisterMessageExtension(
-              &$extendee$::default_instance(), $number$, $field_type$,
-              $repeated$, $packed$, &$message_type$::default_instance(),
-              $verify$, ::_pbi::LazyAnnotation::$lazy$),
-        )cc");
-      };
-      if (UsingImplicitWeakDescriptor(descriptor_->file(), options_)) {
-        const auto find_index = [](auto* desc) {
-          const std::vector<const Descriptor*> msgs =
-              FlattenMessagesInFile(desc->file());
-          return absl::c_find(msgs, desc) - msgs.begin();
-        };
+      if (using_implicit_weak_descriptors) {
         p->Emit(
             {
-                {"extendee_table",
-                 DescriptorTableName(descriptor_->containing_type()->file(),
-                                     options_)},
-                {"extendee_index", find_index(descriptor_->containing_type())},
                 {"extension_table",
                  DescriptorTableName(descriptor_->message_type()->file(),
                                      options_)},
                 {"extension_index", find_index(descriptor_->message_type())},
-                {"preregister", priority == kInitPriority101},
-                {"fallback_for_opt_out",
-                 // For now we have a fallback to use normal registration,
-                 // which should only happen at priority 102.
-                 // Once we turn this on by default we can remove the opt-in
-                 // and the fallback.
-                 [&] {
-                   if (priority != kInitPriority102) return;
-                   register_message();
-                 }},
             },
             R"cc(
               //
@@ -258,21 +265,49 @@ void ExtensionGenerator::GenerateRegistration(io::Printer* p,
                   $repeated$, {&$extension_table$, $extension_index$}, $verify$,
                   ::_pbi::LazyAnnotation::$lazy$, $preregister$),
 #else
-              $fallback_for_opt_out$,
-#endif
             )cc");
-      } else {
-        register_message();
+      }
+      if (priority == kInitPriority102) {
+        p->Emit(R"cc(
+          ::_pbi::ExtensionSet::RegisterMessageExtension(
+              &$extendee$::default_instance(), $number$, $field_type$,
+              $repeated$, $packed$, &$message_type$::default_instance(),
+              $verify$, ::_pbi::LazyAnnotation::$lazy$),
+        )cc");
+      }
+      if (using_implicit_weak_descriptors) {
+        p->Emit(R"cc(
+#endif
+        )cc");
       }
       break;
     }
+
     default:
-      p->Emit(
-          R"cc(
-            ::_pbi::ExtensionSet::RegisterExtension(
-                &$extendee$::default_instance(), $number$, $field_type$,
-                $repeated$, $packed$),
-          )cc");
+      if (using_implicit_weak_descriptors) {
+        p->Emit(R"cc(
+          //
+#if defined(PROTOBUF_INTERNAL_TEMPORARY_WEAK_EXTENSION_OPT_IN)
+          ::_pbi::ExtensionSet::RegisterWeakExtension(
+              {&$extendee_table$, $extendee_index$}, $number$, $field_type$,
+              $repeated$, $packed$, $preregister$),
+#else
+        )cc");
+      }
+      if (priority == kInitPriority102) {
+        p->Emit(
+            R"cc(
+              ::_pbi::ExtensionSet::RegisterExtension(
+                  &$extendee$::default_instance(), $number$, $field_type$,
+                  $repeated$, $packed$),
+            )cc");
+      }
+      if (using_implicit_weak_descriptors) {
+        p->Emit(R"cc(
+#endif
+        )cc");
+      }
+
       break;
   }
 }

@@ -12,6 +12,7 @@
 // Contains methods defined in extension_set.h which cannot be part of the
 // lite library because they use descriptors or reflection.
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -428,34 +429,60 @@ uint8_t* ExtensionSet::SerializeMessageSetWithCachedSizesToArray(
 // In the second phase, we generate the missing prototypes, but that requires
 // parsing descriptors, which in turn require the extensions from the first
 // phase.
+
+template <typename... Refs>
+static std::array<const Message*, sizeof...(Refs)>
+GetWeakPrototypeIfCorrectPhase(bool is_preregistration, Refs... ref) {
+  bool has_all = true;
+  bool dummy[] = {
+      (has_all = has_all && GetPrototypeForWeakDescriptor(
+                                ref.table, ref.index, false) != nullptr)...};
+  (void)dummy;
+  if (is_preregistration != has_all) {
+    // This is done on the other phase.
+    return {};
+  }
+
+  return {GetPrototypeForWeakDescriptor(ref.table, ref.index, true)...};
+}
+
+void ExtensionSet::RegisterWeakExtension(internal::WeakPrototypeRef extendee,
+                                         int number, FieldType type,
+                                         bool is_repeated, bool is_packed,
+                                         bool is_preregistration) {
+  if (auto* extendee_msg =
+          GetWeakPrototypeIfCorrectPhase(is_preregistration, extendee)[0]) {
+    ExtensionSet::RegisterExtension(extendee_msg, number, type, is_repeated,
+                                    is_packed);
+  }
+}
+
+void ExtensionSet::RegisterWeakEnumExtension(
+    internal::WeakPrototypeRef extendee, int number, FieldType type,
+    bool is_repeated, bool is_packed, EnumValidityFunc* is_valid,
+    bool is_preregistration) {
+  if (auto* extendee_msg =
+          GetWeakPrototypeIfCorrectPhase(is_preregistration, extendee)[0]) {
+    ExtensionSet::RegisterEnumExtension(extendee_msg, number, type, is_repeated,
+                                        is_packed, is_valid);
+  }
+}
+
 void ExtensionSet::RegisterWeakMessageExtension(
     internal::WeakPrototypeRef extendee, int number, FieldType type,
     bool is_repeated, internal::WeakPrototypeRef prototype,
     LazyEagerVerifyFnType verify_func, LazyAnnotation is_lazy,
     bool is_preregistration) {
-  auto* extendee_msg =
-      GetPrototypeForWeakDescriptor(extendee.table, extendee.index, false);
-  auto* prototype_msg =
-      GetPrototypeForWeakDescriptor(prototype.table, prototype.index, false);
+  auto msgs =
+      GetWeakPrototypeIfCorrectPhase(is_preregistration, extendee, prototype);
+  auto* extendee_msg = msgs[0];
+  auto* prototype_msg = msgs[1];
 
-  const bool have_both = extendee_msg != nullptr && prototype_msg != nullptr;
-  if (is_preregistration != have_both) {
-    // This is done on the other phase.
-    return;
+  if (extendee_msg != nullptr && prototype_msg != nullptr) {
+    ExtensionSet::RegisterMessageExtension(
+        extendee_msg, number, type, is_repeated,
+        /*is_packed=*/false, prototype_msg, verify_func, is_lazy);
   }
-
-  if (extendee_msg == nullptr) {
-    extendee_msg =
-        GetPrototypeForWeakDescriptor(extendee.table, extendee.index, true);
-  }
-  if (prototype_msg == nullptr) {
-    prototype_msg =
-        GetPrototypeForWeakDescriptor(prototype.table, prototype.index, true);
-  }
-
-  ExtensionSet::RegisterMessageExtension(
-      extendee_msg, number, type, is_repeated,
-      /*is_packed=*/false, prototype_msg, verify_func, is_lazy);
 }
 #endif  // PROTOBUF_DESCRIPTOR_WEAK_MESSAGES_ALLOWED
 

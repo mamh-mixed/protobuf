@@ -234,9 +234,18 @@ class PROTOBUF_EXPORT ExtensionSet {
                                        LazyEagerVerifyFnType verify_func,
                                        LazyAnnotation is_lazy);
 
-  // As RegisterMessageExtension, but for the weak descriptor message mode.
+  // As above, but for the weak descriptor message mode.
   // It will perform the registration in two phases to guarantee we can parse
   // descriptors properly.
+  static void RegisterWeakExtension(internal::WeakPrototypeRef extendee,
+                                    int number, FieldType type,
+                                    bool is_repeated, bool is_packed,
+                                    bool is_preregistration);
+  static void RegisterWeakEnumExtension(internal::WeakPrototypeRef extendee,
+                                        int number, FieldType type,
+                                        bool is_repeated, bool is_packed,
+                                        EnumValidityFunc* is_valid,
+                                        bool is_preregistration);
   static void RegisterWeakMessageExtension(internal::WeakPrototypeRef extendee,
                                            int number, FieldType type,
                                            bool is_repeated,
