@@ -1047,8 +1047,16 @@ void GenerateRs(Context& ctx, const Descriptor& msg) {
           pub fn serialize(&self) -> $pbr$::SerializedData {
             self.as_view().serialize()
           }
+          #[deprecated = "deserialize has been renamed to clear_and_parse"]
           pub fn deserialize(&mut self, data: &[u8]) -> Result<(), $pb$::ParseError> {
-            $Msg::deserialize$
+            self.parse(self, data)
+          }
+          pub fn clear_and_parse(&mut self, data: &[u8]) -> Result<(), $pb$::ParseError> {
+            $Msg::parse$
+          }
+          pub fn parse(data: &[u8]) -> Result<Self, $pb$::ParseError> {
+            let mut msg = Self::new();
+            msg.deserialize(data).map(|_|msg)
           }
 
           pub fn as_view(&self) -> $Msg$View {
