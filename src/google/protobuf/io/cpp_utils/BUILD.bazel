@@ -23,11 +23,39 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "namespace_printer",
+    srcs = ["namespace_printer.cc"],
+    hdrs = ["namespace_printer.h"],
+    copts = COPTS,
+    strip_include_prefix = "/src",
+    deps = [
+        "//src/google/protobuf/io:printer",
+        "@com_google_absl//absl/log:die_if_null",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 cc_test(
     name = "ifndef_guard_unittest",
     srcs = ["ifndef_guard_unittest.cc"],
     deps = [
         ":ifndef_guard",
+        "//src/google/protobuf/io",
+        "//src/google/protobuf/io:printer",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/strings:string_view",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "namespace_printer_unittest",
+    srcs = ["namespace_printer_unittest.cc"],
+    deps = [
+        ":namespace_printer",
         "//src/google/protobuf/io",
         "//src/google/protobuf/io:printer",
         "@com_google_absl//absl/log:absl_check",
