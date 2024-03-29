@@ -226,6 +226,16 @@ macro_rules! impl_repeated_base {
                 )
             }
         }
+        fn repeated_reserve(mut f: Mut<Repeated<$t>>, additional: usize) {
+            // SAFETY:
+            // - `upb_Array_Reserve` is unsafe but assumed to be sound when called on a
+            //   valid array.
+            unsafe {
+                let arena = f.raw_arena(Private);
+                let size = upb_Array_Size(f.as_raw(Private));
+                assert!(upb_Array_Reserve(f.as_raw(Private), size + additional, arena));
+            }
+        }
     };
 }
 
