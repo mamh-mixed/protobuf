@@ -450,6 +450,19 @@ void GenerateEnumDefinition(Context& ctx, const EnumDescriptor& desc) {
           $pbr$::cast_enum_repeated_mut($pbi$::Private, dest)
             .copy_from($pbr$::cast_enum_repeated_view($pbi$::Private, src))
         }
+        
+        fn repeated_reserve(
+            mut r: $pb$::Mut<$pb$::Repeated<Self>>,
+            additional: usize,
+        ) {
+            // SAFETY:
+            // - `f.as_raw()` is a valid `upb_Array*`.
+            unsafe {
+              let mut f = $pbr$::cast_enum_repeated_mut($pbi$::Private, r);
+              let size = $pbr$::upb_Array_Size(f.as_raw($pbi$::Private));
+              $pbr$::upb_Array_Reserve(f.as_raw($pbi$::Private), size + additional, f.raw_arena($pbi$::Private));
+            }
+        }
       }
 
       // SAFETY: this is an enum type
