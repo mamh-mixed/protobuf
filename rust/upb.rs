@@ -18,7 +18,6 @@ use std::mem::{size_of, ManuallyDrop, MaybeUninit};
 use std::ptr::{self, NonNull};
 use std::slice;
 use std::sync::OnceLock;
-
 extern crate upb;
 
 // Temporarily 'pub' since a lot of gencode is directly calling any of the ffi
@@ -607,8 +606,7 @@ impl UpbTypeConversions for ProtoBytes {
         // SAFETY: The arena memory is not freed due to `ManuallyDrop`.
         let arena = ManuallyDrop::new(unsafe { Arena::from_raw(raw_arena) });
         let copied = copy_bytes_in_arena(&arena, val);
-        let msg_val = Self::to_message_value(copied);
-        msg_val
+        Self::to_message_value(copied)
     }
 
     unsafe fn from_message_value<'msg>(msg: upb_MessageValue) -> View<'msg, ProtoBytes> {
