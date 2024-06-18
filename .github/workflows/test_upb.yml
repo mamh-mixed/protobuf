@@ -16,8 +16,9 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        bazel-version: ["7.1.2"]
         config:
-          - { name: "Bazel 7", bazel_version: "7.1.1" }
+          - { name: "Bazel 7", bazel_version: "7.1.2" }
           - { name: "Fastbuild" }
           - { name: "Optimized", flags: "-c opt" }
           - { name: "ASAN", flags: "--config=asan -c dbg", exclude-targets: "-//benchmarks:benchmark -//python/...", runner: ubuntu-20-large }
@@ -35,9 +36,9 @@ jobs:
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+        uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/sanitize:${{ matrix.config.bazel_version || '6.3.0' }}-75f2a85ece6526cc3d54087018c0f1097d78d42b
+          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/sanitize:${{ matrix.config.bazel_version }}-32f99e4e642096935aa0e50862482f7ffe1b231b
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: upb-bazel
           bazel: test --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 //bazel/... //benchmarks/... //lua/... //python/... //upb/... //upb_generator/... ${{ matrix.config.flags }}
@@ -46,17 +47,19 @@ jobs:
   linux-gcc:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
+      matrix:
+        bazel-version: ["7.1.2"]
     name: GCC Optimized
     runs-on: ubuntu-latest
     steps:
       - name: Checkout pending changes
-        uses: protocolbuffers/protobuf-ci/checkout@v3
+        uses: protocolbuffers/protobuf-ci/checkout@b7-test
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+        uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
         with:
-          image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc:12.2-6.3.0-63dd26c0c7a808d92673a3e52e848189d4ab0f17"
+          image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc:${{ matrix.bazel_version }}-12.2-2d59f978645853c5156710320db037095b6a39e5"
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: "upb-bazel-gcc"
           bazel: test --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 -c opt //bazel/... //benchmarks/... //lua/... //python/... //upb/... //upb_generator/...
@@ -64,11 +67,13 @@ jobs:
   windows:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
+      matrix:
+        bazel-version: ["7.1.2"]
     name: Windows
     runs-on: windows-2022
     steps:
       - name: Checkout pending changes
-        uses: protocolbuffers/protobuf-ci/checkout@v3
+        uses: protocolbuffers/protobuf-ci/checkout@b7-test
         with:
           ref: ${{ inputs.safe-checkout }}
       - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
@@ -76,18 +81,19 @@ jobs:
           cache: pip
           cache-dependency-path: 'python/requirements.txt'
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel@v3
+        uses: protocolbuffers/protobuf-ci/bazel@b7-test
         with:
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: "upb-bazel-windows"
           bazel: test --cxxopt=/std:c++17 --host_cxxopt=/std:c++17 //upb/... //upb_generator/... //python/...
-          version: 6.3.0
+          version: ${{ matrix.bazel-version }}
           exclude-targets: -//python:conformance_test -//upb/reflection:def_builder_test
 
   macos:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        bazel-version: ["7.1.2"]
         config:
           - { name: "macOS", bazel-command: "test" }
           - { name: "macOS ARM (build only)", bazel-command: "build", flags: "--cpu=darwin_arm64" }
@@ -95,7 +101,7 @@ jobs:
     runs-on: macos-12
     steps:
       - name: Checkout pending changes
-        uses: protocolbuffers/protobuf-ci/checkout@v3
+        uses: protocolbuffers/protobuf-ci/checkout@b7-test
         with:
           ref: ${{ inputs.safe-checkout }}
       - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
@@ -103,16 +109,18 @@ jobs:
           cache: pip
           cache-dependency-path: 'python/requirements.txt'
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel@v3
+        uses: protocolbuffers/protobuf-ci/bazel@b7-test
         with:
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: "upb-bazel-macos"
-          bazel: ${{ matrix.config.bazel-command }} --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 ${{ matrix.config.flags }} //bazel/... //benchmarks/... //lua/... //python/... //upb/... //upb_generator/...
+          bazel: ${{ matrix.config.bazel-command }} --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 ${{ matrix.config.flags }} //bazel/... //benchmarks/... //lua/... //hpb_generator/... //python/... //upb/... //upb_generator/...
           version: 6.3.0
 
   no-python:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
+      matrix:
+        bazel-version: ["7.1.2"]
     name: No System Python
     runs-on: ubuntu-latest
     steps:
@@ -121,9 +129,9 @@ jobs:
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+        uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:6.3.0-91a0ac83e968068672bc6001a4d474cfd9a50f1d
+          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:${{ matrix.bazel-version }}-bec4e87effd62da1d4f9a13d377e37bcb80376c9
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: "upb-bazel-no-python"
           bash: >-
@@ -133,6 +141,10 @@ jobs:
             bazel test $BAZEL_FLAGS --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 //python/... -- -//python/dist:source_wheel
 
   build_wheels:
+    strategy:
+      fail-fast: false   # Don't cancel all jobs if one fails.
+      matrix:
+        bazel-version: ["7.1.2"]
     name: Build Wheels
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request_target' }}
@@ -142,12 +154,12 @@ jobs:
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Build Wheels
-        uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+        uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
         with:
-          image: us-docker.pkg.dev/protobuf-build/release-containers/linux/apple:6.3.0-53225851b051e66f8543e972c143f35be757a181
+          image: us-docker.pkg.dev/protobuf-build/release-containers/linux/apple:${{ matrix.bazel_version }}-edc97941fac0ebf98b9e3de591708ff887fa15fa
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: upb-bazel-python
-          bazel: build --crosstool_top=//toolchain:clang_suite --//toolchain:release=true --symlink_prefix=/ -c dbg //python/dist //python/dist:test_wheel //python/dist:source_wheel
+          bazel: build --crosstool_top=//toolchain:clang_suite --//toolchain:release=true --symlink_prefix=/ --incompatible_enable_cc_toolchain_resolution=false -c dbg //python/dist //python/dist:test_wheel //python/dist:source_wheel
       - name: Move Wheels
         run: mkdir wheels && find _build/out \( -name 'protobuf*.whl' -o -name 'protobuf-*.tar.gz' \) -exec mv '{}' wheels ';'
       - uses: actions/upload-artifact@v3
@@ -166,27 +178,26 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        bazel-version: ["7.1.2"]
         include:
           # Linux and Mac use the limited API, so all Python versions will use
           # a single wheel. As a result we can just test the oldest and newest
           # supported Python versions and assume this gives us sufficient test
           # coverage.
-          - { os: ubuntu-latest, python-version: "3.8", architecture: x64, type: 'binary' }
-          - { os: macos-12, python-version: "3.8", architecture: x64, type: 'binary' }
+          - { os: ubuntu-latest, python-version: "3.9", architecture: x64, type: 'binary' }
+          - { os: macos-12, python-version: "3.9", architecture: x64, type: 'binary' }
           - { os: ubuntu-latest, python-version: "3.12", architecture: x64, type: 'binary' }
           - { os: macos-13, python-version: "3.12", architecture: x64, type: 'binary' }
-          - { os: ubuntu-latest, python-version: "3.8", architecture: x64, type: 'source' }
-          - { os: macos-12, python-version: "3.8", architecture: x64, type: 'source' }
+          - { os: ubuntu-latest, python-version: "3.9", architecture: x64, type: 'source' }
+          - { os: macos-12, python-version: "3.9", architecture: x64, type: 'source' }
           - { os: ubuntu-latest, python-version: "3.12", architecture: x64, type: 'source' }
           - { os: macos-13, python-version: "3.12", architecture: x64, type: 'source' }
 
           # Windows uses the full API up until Python 3.10.
-          - { os: windows-2019, python-version: "3.8", architecture: x86, type: 'binary' }
           - { os: windows-2019, python-version: "3.9", architecture: x86, type: 'binary' }
           - { os: windows-2019, python-version: "3.10", architecture: x86, type: 'binary' }
           - { os: windows-2019, python-version: "3.11", architecture: x86, type: 'binary' }
           - { os: windows-2019, python-version: "3.12", architecture: x86, type: 'binary' }
-          - { os: windows-2019, python-version: "3.8", architecture: x64, type: 'binary' }
           - { os: windows-2019, python-version: "3.9", architecture: x64, type: 'binary' }
           - { os: windows-2019, python-version: "3.10", architecture: x64, type: 'binary' }
           - { os: windows-2019, python-version: "3.11", architecture: x64, type: 'binary' }
@@ -251,7 +262,7 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
-        python-version: ["3.8", "3.12"]
+        python-version: ["3.9", "3.12"]
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request_target' }}
     steps:

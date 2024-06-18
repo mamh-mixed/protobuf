@@ -16,35 +16,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        bazel-version: ['7.1.2']
         include:
           - name: OpenJDK 8
             version: '8'
-            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java:8-1fdbb997433cb22c1e49ef75ad374a8d6bb88702
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java:8-23af5a0a246d26a2b8b658392d234be545f9c202
             # TODO: b/318555165 - enable the layering check. Currently it does
             # not work correctly with the toolchain in this Docker image.
             targets: //java/... //java/internal:java_version //compatibility/... --features=-layering_check
           - name: OpenJDK 11
             version: '11'
-            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java:11-1fdbb997433cb22c1e49ef75ad374a8d6bb88702
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java@sha256:f0a43fe8eb5a5180b4207f23d4ad9ebf618b1b78d3403eeeb4e7e45c9b1c7a9d
             targets: //java/... //java/internal:java_version //compatibility/...
           - name: OpenJDK 17
             version: '17'
-            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java:17-1fdbb997433cb22c1e49ef75ad374a8d6bb88702
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java@sha256:fe556e90c77901a63d5acf0567bd33130125d5fe4d50af20271f8a32314a5bc6
             targets: //java/... //java/internal:java_version //compatibility/...
           - name: aarch64
             version: 'aarch64'
-            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation:aarch64-63dd26c0c7a808d92673a3e52e848189d4ab0f17
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation:${{ matrix.bazel-version }}-aarch64-f42c2179c00aaa8fedfe95cdc0bf14e862541604
             targets: //java/... //compatibility/... //src/google/protobuf/compiler:protoc_aarch64_test
 
     name: Linux ${{ matrix.name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout pending changes
-        uses: protocolbuffers/protobuf-ci/checkout@v3
+        uses: protocolbuffers/protobuf-ci/checkout@b7-test
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+        uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
         with:
           image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
@@ -75,14 +76,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout pending changes
-      uses: protocolbuffers/protobuf-ci/checkout@v3
+      uses: protocolbuffers/protobuf-ci/checkout@b7-test
       with:
         ref: ${{ inputs.safe-checkout }}
     - name: Build protoc
       id: build-protoc
-      uses: protocolbuffers/protobuf-ci/cross-compile-protoc@v3
+      uses: protocolbuffers/protobuf-ci/cross-compile-protoc@b7-test
       with:
-        image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:6.3.0-91a0ac83e968068672bc6001a4d474cfd9a50f1d
+        image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:{{ matrix.bazel-version }}-bec4e87effd62da1d4f9a13d377e37bcb80376c9
         credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
         architecture: linux-x86_64
     - name: Move protoc into place and clean up
@@ -91,12 +92,12 @@ jobs:
         sudo rm -rf _build
     - name: Install snapshot version locally (not using generated pom.xml)
       run: |
-        mvn -e -B -Dhttps.protocols=TLSv1.2 install -Dmaven.test.skip=true
+        mvn -X -e -B -Dhttps.protocols=TLSv1.2 install -Dmaven.test.skip=true
       working-directory: java
     - name: Generate pom.xml files from the template
-      uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+      uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
       with:
-        image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java:11-1fdbb997433cb22c1e49ef75ad374a8d6bb88702
+        image: us-docker.pkg.dev/protobuf-build/containers/test/linux/java:11-21efb73c613deddd6db6a0a86f262324a77de13f
         credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
         bazel-cache: java_linux/11
         # protobuf-java and protobuf-java-util are the member of the BOM

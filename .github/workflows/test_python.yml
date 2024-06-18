@@ -18,7 +18,8 @@ jobs:
       matrix:
         type: [ Pure, C++]
         # TODO: b/309627662 - Add coverage for Python 3.12.
-        version: ["3.8", "3.9", "3.10", "3.11"]
+        version: ["3.9", "3.10", "3.11"]
+        bazel-version: ["7.1.2"]
         include:
           - type: Pure
             targets: //python/... //python:python_version_test
@@ -30,8 +31,8 @@ jobs:
             version: aarch64
             targets: //python/... //python:aarch64_test
             # TODO Enable this once conformance tests are fixed.
-            flags: --define=use_fast_cpp_protos=true --test_tag_filters=-conformance
-            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation:aarch64-63dd26c0c7a808d92673a3e52e848189d4ab0f17
+            flags: --define=use_fast_cpp_protos=true --test_tag_filters=-conformance --test_verbose_timeout_warnings
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation:${matrix.bazel-version}-aarch64-f42c2179c00aaa8fedfe95cdc0bf14e862541604
 
     name: Linux ${{ matrix.type }} ${{ matrix.version }}
     runs-on: ubuntu-latest
@@ -41,9 +42,9 @@ jobs:
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel-docker@v3
+        uses: protocolbuffers/protobuf-ci/bazel-docker@b7-test
         with:
-          image: ${{ matrix.image || format('us-docker.pkg.dev/protobuf-build/containers/test/linux/python:{0}-63dd26c0c7a808d92673a3e52e848189d4ab0f17', matrix.version) }}
+          image: ${{ matrix.image || format('us-docker.pkg.dev/protobuf-build/containers/test/linux/python:7.1.2-{0}-8f49ab0560dac854ccd42749a07175803d7d2928', matrix.version) }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: python_linux/${{ matrix.type }}_${{ matrix.version }}
           bazel: test ${{ matrix.targets }} ${{ matrix.flags }} --test_env=KOKORO_PYTHON_VERSION
@@ -57,6 +58,7 @@ jobs:
         type: [ Pure, C++]
         # TODO Consider expanding this set of versions.
         version: [ "3.12" ]
+        bazel-version: ["7.1.2"]
         include:
           - type: Pure
             targets: //python/... //python:python_version_test
@@ -88,12 +90,13 @@ jobs:
           source venv/bin/activate
 
       - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel@v3
+        uses: protocolbuffers/protobuf-ci/bazel@b7-test
         env:
           KOKORO_PYTHON_VERSION: ${{ matrix.version }}
         with:
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: python_macos/${{ matrix.type }}_${{ matrix.version }}
+          version: ${{ matrix.bazel-version }}
           bazel: >-
             test ${{ matrix.targets }} ${{ matrix.flags }}
             --test_env=KOKORO_PYTHON_VERSION=${{ matrix.version }}
