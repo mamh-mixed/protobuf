@@ -155,7 +155,7 @@
 #         "@com_google_absl//absl/status:statusor",
 #         "@com_google_absl//absl/strings",
 #         "//protos",
-#         "//protos:requires",
+#         "//hpb:requires",
 #         "//upb:mem",
 #         "//protos:repeated_field",
 #     ],
