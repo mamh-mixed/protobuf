@@ -205,36 +205,38 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::pb::enumvalue::JsonEnumValueOptions_globals_,
 };
-const char descriptor_table_protodef_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
-    protodesc_cold) = {
-    "\n,google/protobuf/json_enumvalue_options"
-    ".proto\022\014pb.enumvalue\032 google/protobuf/de"
-    "scriptor.proto\"(\n\024JsonEnumValueOptions\022\016"
-    "\n\006string\030\001 \001(\tX\001:\\\n\004json\022!.google.protob"
-    "uf.EnumValueOptions\030\346\007 \001(\0132\".pb.enumvalu"
-    "e.JsonEnumValueOptionsB\006\262\001\003\010\217Nb\010editions"
-    "p\351\007"
-};
+const char
+    descriptor_table_protodef_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto
+        [] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
+            "\n,google/protobuf/json_enumvalue_options"
+            ".proto\022\014pb.enumvalue\032 google/protobuf/de"
+            "scriptor.proto\"(\n\024JsonEnumValueOptions\022\016"
+            "\n\006string\030\001 \001(\tX\001:\\\n\004json\022!.google.protob"
+            "uf.EnumValueOptions\030\346\007 \001(\0132\".pb.enumvalu"
+            "e.JsonEnumValueOptionsB\006\262\001\003\010\217NB\032\n\030com.go"
+            "ogle.protobuf.utilb\010editionsp\351\007"};
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
 };
 static ::absl::once_flag descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto_once;
-PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto = {
-    false,
-    false,
-    243,
-    descriptor_table_protodef_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto,
-    "google/protobuf/json_enumvalue_options.proto",
-    &descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto_once,
-    descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto_deps,
-    1,
-    1,
-    schemas,
-    file_message_globals,
-    TableStruct_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto::offsets,
-    file_level_enum_descriptors_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto,
-    file_level_service_descriptors_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto,
+PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable
+    descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto = {
+        false,
+        false,
+        271,
+        descriptor_table_protodef_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto,
+        "google/protobuf/json_enumvalue_options.proto",
+        &descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto_once,
+        descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto_deps,
+        1,
+        1,
+        schemas,
+        file_message_globals,
+        TableStruct_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto::
+            offsets,
+        file_level_enum_descriptors_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto,
+        file_level_service_descriptors_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto,
 };
 namespace pb {
 namespace enumvalue {
