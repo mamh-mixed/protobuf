@@ -15,6 +15,7 @@ serialization code in the whole library.
 
 __author__ = 'gps@google.com (Gregory P. Smith)'
 
+import array
 import collections
 import copy
 import math
@@ -456,6 +457,27 @@ class MessageTest(unittest.TestCase):
     self.assertEqual(2, len(msg.repeated_nested_message))
     self.assertEqual([1, 2], [m.bb for m in msg.repeated_nested_message])
 
+  def testExtendRepeatedCompositeField(self, message_module):
+    msg = message_module.TestAllTypes()
+    msg.repeated_nested_message.extend([
+        message_module.TestAllTypes.NestedMessage(bb=1),
+        message_module.TestAllTypes.NestedMessage(bb=2),
+    ])
+    self.assertEqual(2, len(msg.repeated_nested_message))
+    self.assertEqual([1, 2], [m.bb for m in msg.repeated_nested_message])
+
+    # Extend with an invalid item should raise TypeError.
+    with self.assertRaises(TypeError):
+      msg.repeated_nested_message.extend([
+          message_module.TestAllTypes.NestedMessage(bb=3),
+          1,
+          message_module.TestAllTypes.NestedMessage(bb=4),
+      ])
+    # Should not have added the invalid item or any subsequent items.
+    self.assertEqual(3, len(msg.repeated_nested_message))
+    with self.assertRaises(TypeError):
+      msg.repeated_nested_message[:] = []
+
   def testInsertRepeatedCompositeField(self, message_module):
     msg = message_module.TestAllTypes()
     msg.repeated_nested_message.insert(
@@ -505,6 +527,28 @@ class MessageTest(unittest.TestCase):
   def testAssignRepeatedField(self, message_module):
     msg = message_module.NestedTestAllTypes()
     msg.payload.repeated_int32[:] = [1, 2, 3, 4]
+    self.assertEqual(4, len(msg.payload.repeated_int32))
+    self.assertEqual([1, 2, 3, 4], msg.payload.repeated_int32)
+
+  def testAssignRepeatedFieldFromArray(self, message_module):
+    msg = message_module.NestedTestAllTypes()
+    msg.payload.repeated_int32[:] = array.array('i', [1, 2, 3, 4])
+    self.assertEqual(4, len(msg.payload.repeated_int32))
+    self.assertEqual([1, 2, 3, 4], msg.payload.repeated_int32)
+
+  def testAssignRepeatedFieldFromSlicedMemoryView(self, message_module):
+    msg = message_module.NestedTestAllTypes()
+    arr = array.array('i', [1, 1, 2, 2, 3, 3, 4, 4])
+    msg.payload.repeated_int32[:] = memoryview(arr)[::2]
+    self.assertEqual(4, len(msg.payload.repeated_int32))
+    self.assertEqual([1, 2, 3, 4], msg.payload.repeated_int32)
+
+  def testAssignRepeatedFieldFromGenerator(self, message_module):
+    msg = message_module.NestedTestAllTypes()
+    def gen():
+      for i in range(1, 5):
+        yield i
+    msg.payload.repeated_int32[:] = gen()
     self.assertEqual(4, len(msg.payload.repeated_int32))
     self.assertEqual([1, 2, 3, 4], msg.payload.repeated_int32)
 

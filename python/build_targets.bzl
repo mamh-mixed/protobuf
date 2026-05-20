@@ -159,6 +159,7 @@ def build_targets(name):
             "@abseil-cpp//absl/status:statusor",
             "@abseil-cpp//absl/strings",
             "@abseil-cpp//absl/synchronization",
+            "@abseil-cpp//absl/types:span",
             "@system_python//:python_headers",
         ],
     )

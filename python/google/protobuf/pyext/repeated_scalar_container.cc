@@ -11,15 +11,14 @@
 #include "google/protobuf/pyext/repeated_scalar_container.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
-#include <memory>
+#include <limits>
 #include <string>
 
+#include "absl/types/span.h"
 #include "google/protobuf/descriptor.h"
-#include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/message.h"
-#include "google/protobuf/pyext/descriptor.h"
-#include "google/protobuf/pyext/descriptor_pool.h"
 #include "google/protobuf/pyext/message.h"
 #include "google/protobuf/pyext/scoped_pyobject_ptr.h"
 
@@ -387,6 +386,9 @@ static PyObject* AppendMethod(PyObject* self, PyObject* item) {
   return Append(reinterpret_cast<RepeatedScalarContainer*>(self), item);
 }
 
+static bool ExtendInternal(RepeatedScalarContainer* self, PyObject* value,
+                           bool clear_first);
+
 static int AssSubscript(PyObject* pself, PyObject* slice, PyObject* value) {
   RepeatedScalarContainer* self =
       reinterpret_cast<RepeatedScalarContainer*>(pself);
@@ -425,6 +427,16 @@ static int AssSubscript(PyObject* pself, PyObject* slice, PyObject* value) {
     return AssignItem(pself, from, value);
   }
 
+  // Fast path for full slice assignment/extension.
+  bool is_full_slice = from == 0 && to == length;
+  bool is_extension = slicelength == 0 && from == length;
+  if ((is_full_slice || is_extension)) {
+    if (ExtendInternal(self, value, is_full_slice)) {
+      return 0;
+    }
+    return -1;
+  }
+
   ScopedPyObjectPtr full_slice(PySlice_New(nullptr, nullptr, nullptr));
   if (full_slice == nullptr) {
     return -1;
@@ -440,24 +452,170 @@ static int AssSubscript(PyObject* pself, PyObject* slice, PyObject* value) {
   return InternalAssignRepeatedField(self, new_list.get());
 }
 
-PyObject* Extend(RepeatedScalarContainer* self, PyObject* value) {
-  if (cmessage::AssureWritable(self->parent) == nullptr) return nullptr;
+// Returns true if the given PyObject* value has a contiguous 1D view.
+// If so, the view is filled in and the function returns true.
+// Otherwise, the function returns false.
+// view must be released by the caller if the function returns true.
+static bool GetContiguous1DView(PyObject* value, Py_buffer* view) {
+  if (PyObject_GetBuffer(value, view, PyBUF_RECORDS_RO) != 0) {
+    PyErr_Clear();
+    return false;
+  }
+  if (view->format == nullptr) {
+    PyBuffer_Release(view);
+    return false;
+  }
+  if (((view->ndim == 1) &&
+       (view->strides == nullptr || view->itemsize == view->strides[0]))) {
+    return true;
+  }
+
+  PyBuffer_Release(view);
+  return false;
+}
+
+template <typename T>
+static void AddRange(const Reflection* reflection,
+                     const FieldDescriptor* field_descriptor, Message* message,
+                     bool clear_first, absl::Span<const T> values) {
+  MutableRepeatedFieldRef<T> mutable_ref =
+      reflection->GetMutableRepeatedFieldRef<T>(message, field_descriptor);
+  if (clear_first) {
+    mutable_ref.CopyFrom(values);
+  } else {
+    mutable_ref.MergeFrom(values);
+  }
+}
+
+// Returns whether the value was successfully extended.
+// If clear_first is true, the field is cleared before extending.
+// A Python exception is set on failure.
+static bool ExtendInternal(RepeatedScalarContainer* self, PyObject* value,
+                           bool clear_first) {
+  Message* message = cmessage::AssureWritable(self->parent);
+  if (message == nullptr) return false;
+  Py_buffer view;
+  const FieldDescriptor* field_descriptor = self->parent_field_descriptor;
+  if (GetContiguous1DView(value, &view)) {
+    const char* format = view.format;
+    const char fmt = format[0];
+    const size_t size = static_cast<size_t>(view.len / view.itemsize);
+    const Reflection* reflection = message->GetReflection();
+    if (size > std::numeric_limits<int>::max()) {
+      PyBuffer_Release(&view);
+      PyErr_SetString(PyExc_ValueError, "Repeated field too large");
+      return false;
+    }
+
+    // Fast path for contiguous 1D views.
+    // See https://docs.python.org/3/library/struct.html#format-characters
+    switch (field_descriptor->cpp_type()) {
+      case FieldDescriptor::CPPTYPE_INT32:
+        if (fmt == 'i' || (fmt == 'l' && view.itemsize == 4)) {
+          AddRange(reflection, field_descriptor, message, clear_first,
+                   absl::MakeSpan(static_cast<const int32_t*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      case FieldDescriptor::CPPTYPE_INT64:
+        if (fmt == 'q' || (fmt == 'l' && view.itemsize == 8)) {
+          AddRange(reflection, field_descriptor, message, clear_first,
+                   absl::MakeSpan(static_cast<const int64_t*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      case FieldDescriptor::CPPTYPE_UINT32:
+        if (fmt == 'I') {
+          AddRange(
+              reflection, field_descriptor, message, clear_first,
+              absl::MakeSpan(static_cast<const uint32_t*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      case FieldDescriptor::CPPTYPE_UINT64:
+        if (fmt == 'Q') {
+          AddRange(
+              reflection, field_descriptor, message, clear_first,
+              absl::MakeSpan(static_cast<const uint64_t*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      case FieldDescriptor::CPPTYPE_FLOAT:
+        if (fmt == 'f') {
+          AddRange(reflection, field_descriptor, message, clear_first,
+                   absl::MakeSpan(static_cast<const float*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      case FieldDescriptor::CPPTYPE_DOUBLE:
+        if (fmt == 'd') {
+          AddRange(reflection, field_descriptor, message, clear_first,
+                   absl::MakeSpan(static_cast<const double*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      case FieldDescriptor::CPPTYPE_BOOL:
+        if (fmt == '?' || fmt == 'B') {
+          AddRange(reflection, field_descriptor, message, clear_first,
+                   absl::MakeSpan(static_cast<const bool*>(view.buf), size));
+          PyBuffer_Release(&view);
+          return true;
+        }
+        break;
+      default:
+        break;
+    }
+
+    if (format[0] == 'O') {
+      PyObject** array = static_cast<PyObject**>(view.buf);
+      if (clear_first) {
+        message->GetReflection()->ClearField(message, field_descriptor);
+      }
+      for (size_t i = 0; i < size; ++i) {
+        if (ScopedPyObjectPtr(Append(
+                self, array[i] != nullptr ? array[i] : Py_None)) == nullptr) {
+          PyBuffer_Release(&view);
+          return false;
+        }
+      }
+      PyBuffer_Release(&view);
+      return true;
+    }
+    PyBuffer_Release(&view);
+  }
 
   ScopedPyObjectPtr iter(PyObject_GetIter(value));
   if (iter == nullptr) {
     PyErr_SetString(PyExc_TypeError, "Value must be iterable");
-    return nullptr;
+    return false;
+  }
+  if (clear_first) {
+    message->GetReflection()->ClearField(message, field_descriptor);
   }
   ScopedPyObjectPtr next;
   while ((next.reset(PyIter_Next(iter.get()))) != nullptr) {
     if (ScopedPyObjectPtr(Append(self, next.get())) == nullptr) {
-      return nullptr;
+      return false;
     }
   }
   if (PyErr_Occurred()) {
-    return nullptr;
+    return false;
   }
-  Py_RETURN_NONE;
+  return true;
+}
+
+PyObject* Extend(RepeatedScalarContainer* self, PyObject* value) {
+  cmessage::AssureWritable(self->parent);
+  if (ExtendInternal(self, value, false)) {
+    Py_RETURN_NONE;
+  }
+  return nullptr;
 }
 
 static PyObject* Insert(PyObject* pself, PyObject* args) {
@@ -955,7 +1113,7 @@ PyTypeObject RepeatedScalarContainer_Type = {
 #if PY_VERSION_HEX >= 0x03080000
     0,  //  tp_vectorcall_offset
 #else
-    nullptr,             //  tp_print
+    nullptr,  //  tp_print
 #endif
     nullptr,                                //  tp_getattr
     nullptr,                                //  tp_setattr
