@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package utf8validation;
+
+option java_package = "com.google.protobuf.utf8validation";
+option java_outer_classname = "Utf8TestProto3CheckedProto";
+option java_multiple_files = true;
+option java_string_check_utf8 = true;
+
+message Utf8TestProto3Checked {
+  optional string checked_unset = 1;
+
+  // TODO: Enable once allowlist entry is built into protoc.
+  // optional string checked_unenforced = 2 [enforce_utf8 = false];
+
+  optional string checked_enforced = 3 [enforce_utf8 = true];
+}

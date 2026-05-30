@@ -1,0 +1,27 @@
+syntax = "proto2";
+
+package utf8validation;
+
+option java_package = "com.google.protobuf.utf8validation";
+option java_outer_classname = "Utf8TestProto2Proto";
+option java_multiple_files = true;
+
+message Utf8TestProto2 {
+  optional string unset_unset = 1;
+
+  // TODO: Enable once allowlist entry is built into protoc.
+  // optional string unset_unenforced = 2 [enforce_utf8 = false];
+
+  optional string unset_enforced = 3 [enforce_utf8 = true];
+
+  extensions 100 to 200;
+}
+
+extend Utf8TestProto2 {
+  optional string ext_unset_unset = 100;
+
+  // TODO: Enable once allowlist entry is built into protoc.
+  // optional string ext_unset_unenforced = 101 [enforce_utf8 = false];
+
+  optional string ext_unset_enforced = 102 [enforce_utf8 = true];
+}

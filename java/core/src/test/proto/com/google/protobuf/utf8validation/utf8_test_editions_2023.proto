@@ -1,0 +1,77 @@
+
+edition = "2023";
+
+package utf8validation;
+
+import "google/protobuf/java_features.proto";
+
+option java_package = "com.google.protobuf.utf8validation";
+option java_outer_classname = "Utf8TestEditions2023Proto";
+option java_multiple_files = true;
+
+message Utf8TestEditions2023 {
+  // Regular fields
+  string unset_unset = 1;
+
+  string unset_default = 2 [features.(pb.java).utf8_validation = DEFAULT];
+
+  string unset_verify = 3 [features.(pb.java).utf8_validation = VERIFY];
+
+  string verify_unset = 4 [features.utf8_validation = VERIFY];
+
+  string verify_default = 5 [
+    features.utf8_validation = VERIFY,
+    features.(pb.java).utf8_validation = DEFAULT
+  ];
+
+  string verify_verify = 6 [
+    features.utf8_validation = VERIFY,
+    features.(pb.java).utf8_validation = VERIFY
+  ];
+
+  string none_unset = 7 [features.utf8_validation = NONE];
+
+  string none_default = 8 [
+    features.utf8_validation = NONE,
+    features.(pb.java).utf8_validation = DEFAULT
+  ];
+
+  string none_verify = 9 [
+    features.utf8_validation = NONE,
+    features.(pb.java).utf8_validation = VERIFY
+  ];
+
+  extensions 100 to 200;
+}
+
+extend Utf8TestEditions2023 {
+  string ext_unset_unset = 101;
+
+  string ext_unset_default = 102 [features.(pb.java).utf8_validation = DEFAULT];
+
+  string ext_unset_verify = 103 [features.(pb.java).utf8_validation = VERIFY];
+
+  string ext_verify_unset = 104 [features.utf8_validation = VERIFY];
+
+  string ext_verify_default = 105 [
+    features.utf8_validation = VERIFY,
+    features.(pb.java).utf8_validation = DEFAULT
+  ];
+
+  string ext_verify_verify = 106 [
+    features.utf8_validation = VERIFY,
+    features.(pb.java).utf8_validation = VERIFY
+  ];
+
+  string ext_none_unset = 107 [features.utf8_validation = NONE];
+
+  string ext_none_default = 108 [
+    features.utf8_validation = NONE,
+    features.(pb.java).utf8_validation = DEFAULT
+  ];
+
+  string ext_none_verify = 109 [
+    features.utf8_validation = NONE,
+    features.(pb.java).utf8_validation = VERIFY
+  ];
+}
