@@ -28,19 +28,7 @@ py_dist_module(
 py_proto_library(
     name = "well_known_proto_py_pb2",
     deps = [
-        "//:any_proto",
-        "//:api_proto",
-        "//:descriptor_proto",
-        "//:duration_proto",
-        "//:empty_proto",
-        "//:field_mask_proto",
-        "//:json_enumvalue_options_proto",
-        "//:json_options_proto",
-        "//:source_context_proto",
-        "//:struct_proto",
-        "//:timestamp_proto",
-        "//:type_proto",
-        "//:wrappers_proto",
+        "//src/google/protobuf:release_all_options_protos",
     ],
 )
 

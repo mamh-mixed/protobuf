@@ -1214,6 +1214,62 @@ filegroup(
 )
 
 filegroup(
+    name = "release_all_options_proto_srcs",
+    srcs = [
+        ":cpp_options_proto_srcs",
+        ":descriptor_proto_srcs",
+        ":json_options_proto_srcs",
+        ":well_known_type_protos",
+        "//csharp:c_sharp_features_proto_srcs",
+        "//go:go_features_proto_srcs",
+        "//java/core:java_features_proto_srcs",
+    ],
+    visibility = [
+        "//java/core:__pkg__",
+        "//pkg:__pkg__",
+        "//python/dist:__pkg__",
+    ],
+)
+
+proto_library(
+    name = "release_all_options_protos",
+    srcs = [
+        ":json_options_proto_srcs",
+        ":well_known_type_protos",
+    ],
+    strip_import_prefix = "/src",
+    visibility = [
+        "//java/core:__pkg__",
+        "//pkg:__pkg__",
+        "//python/dist:__pkg__",
+    ],
+    exports = [
+        ":cpp_options_proto",
+        ":descriptor_proto",
+        "//csharp:c_sharp_features_proto",
+        "//go:go_features_proto",
+        "//java/core:java_features_proto",
+    ],
+    deps = [
+        ":cpp_options_proto",
+        ":descriptor_proto",
+        "//csharp:c_sharp_features_proto",
+        "//go:go_features_proto",
+        "//java/core:java_features_proto",
+    ],
+)
+
+filegroup(
+    name = "cpp_options_proto_srcs",
+    srcs = glob(["cpp_*options.proto"]) + ["cpp_features.proto"],
+)
+
+filegroup(
+    name = "json_options_proto_srcs",
+    srcs = glob(["json_*options.proto"]),
+)
+
+filegroup(
     name = "testdata",
     srcs = glob(["testdata/**/*"]) + [
         "descriptor.cc",
