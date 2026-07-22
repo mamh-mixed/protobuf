@@ -1982,6 +1982,14 @@ class JsonFormatTest(JsonFormatBase):
         {'armor': 1},
     )
 
+  def testParseBooleanInputForEnumFails(self):
+    # In Python, bool is a subclass of int (int(True) == 1). We ensure that JSON
+    # boolean literals like 'true' are rejected for enum fields instead of
+    # silently coercing to integer enum values.
+    msg = json_enumval_custom_string_pb2.Knight()
+    with self.assertRaises(json_format.ParseError):
+      json_format.Parse('{"armor": true}', msg)
+
 
 if __name__ == '__main__':
   unittest.main()

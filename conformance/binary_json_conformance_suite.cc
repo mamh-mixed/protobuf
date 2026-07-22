@@ -2525,6 +2525,12 @@ void BinaryAndJsonConformanceSuiteImpl<
   ExpectParseFailureForJson("Uint64FieldNotInteger", REQUIRED,
                             R"({"optionalUint64": "0.5"})");
 
+  // Parser reject boolean values for integer fields.
+  ExpectParseFailureForJson("Int32FieldTrueValue", REQUIRED,
+                            R"({"optionalInt32": true})");
+  ExpectParseFailureForJson("Int32FieldFalseValue", REQUIRED,
+                            R"({"optionalInt32": false})");
+
   // Parser reject non-numeric string values.
   ExpectParseFailureForJson("Int32FieldStringValuePartiallyNumeric", REQUIRED,
                             R"({"optionalInt32": "12abc"})");
@@ -2794,6 +2800,12 @@ void BinaryAndJsonConformanceSuiteImpl<
                             R"({"optionalNestedEnum": ["FOO"]})");
   ExpectParseFailureForJson("EnumFieldSingleElementArrayNumericValue", REQUIRED,
                             R"({"optionalNestedEnum": [2]})");
+
+  // Booleans are not allowed for enum fields.
+  ExpectParseFailureForJson("EnumFieldTrueValue", REQUIRED,
+                            R"({"optionalNestedEnum": true})");
+  ExpectParseFailureForJson("EnumFieldFalseValue", REQUIRED,
+                            R"({"optionalNestedEnum": false})");
 
   if (run_proto3_tests_) {
     // Unknown enum values are represented as numeric values.

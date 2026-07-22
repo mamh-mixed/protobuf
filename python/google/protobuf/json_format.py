@@ -976,6 +976,12 @@ def _ConvertScalarFieldValue(value, field, path, require_str=False):
             break
       # If not, try parsing it as an integer.
       if enum_value is None:
+        # In Python, bool is a subclass of int (int(True) == 1), so we must
+        # explicitly reject boolean inputs for enum fields.
+        if isinstance(value, bool):
+          raise ParseError(
+              'Bool value {0} is not acceptable for enum field'.format(value)
+          )
         try:
           number = int(value)
           enum_value = field.enum_type.values_by_number.get(number, None)
