@@ -137,6 +137,56 @@ TEST_F(PhpGeneratorTest, ImportPublic) {
   ExpectNoErrors();
 }
 
+TEST_F(PhpGeneratorTest, CustomEnumNames) {
+  CreateTempFile("google/protobuf/json_enumvalue_options.proto",
+                 R"schema(
+    edition = "2024";
+    package pb.enumvalue;
+    import "google/protobuf/descriptor.proto";
+    message JsonEnumValueOptions {
+      string string = 1;
+    }
+    extend google.protobuf.EnumValueOptions {
+      JsonEnumValueOptions json = 998;
+    }
+  )schema");
+
+  CreateTempFile("foo.proto",
+                 R"schema(
+    edition = "2026";
+    package foo;
+    import "google/protobuf/json_enumvalue_options.proto";
+    enum MyEnum {
+      MY_ENUM_UNKNOWN = 0;
+      MY_ENUM_BAR = 1 [(pb.enumvalue.json).string = "custom_bar"];
+      MY_ENUM_BAZ = 2;
+    }
+  )schema");
+
+  RunProtoc(
+      "protocol_compiler --proto_path=$tmpdir --php_out=$tmpdir foo.proto");
+
+  ExpectNoErrors();
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php",
+      "private static $valueToCustomName = [\n"
+      "        self::MY_ENUM_BAR => \"custom_bar\",\n"
+      "    ];");
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php",
+      "private static $customNameToValue = [\n"
+      "        \"custom_bar\" => self::MY_ENUM_BAR,\n"
+      "    ];");
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php", "public static function customName($value)");
+
+  ExpectFileContentContainsSubstring(
+      "Foo/MyEnum.php", "public static function customValue($name)");
+}
+
 }  // namespace
 }  // namespace php
 }  // namespace compiler

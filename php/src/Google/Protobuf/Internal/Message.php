@@ -865,9 +865,20 @@ class Message
                 if (is_integer($value)) {
                     return $value;
                 }
-                $enum_value = $field->getEnumType()->getValueByName($value);
+                $enum_desc = $field->getEnumType();
+                $klass = $enum_desc->getClass();
+                $enum_value = null;
+                if (method_exists($klass, 'customValue')) {
+                    $enum_value = $klass::customValue($value);
+                }
+                if (is_null($enum_value)) {
+                    $enum_value_desc = $enum_desc->getValueByName($value);
+                    if (!is_null($enum_value_desc)) {
+                        $enum_value = $enum_value_desc->getNumber();
+                    }
+                }
                 if (!is_null($enum_value)) {
-                    return $enum_value->getNumber();
+                    return $enum_value;
                 } else if ($ignore_unknown) {
                     return $this->defaultValue($field);
                 } else {
@@ -1774,8 +1785,19 @@ class Message
                 } else {
                     $enum_value_desc = $enum_desc->getValueByNumber($value);
                     if (!is_null($enum_value_desc)) {
-                        $size += 2;  // size for ""
-                        $size += strlen($enum_value_desc->getName());
+                        $klass = $enum_desc->getClass();
+                        $custom_name = null;
+                        if (method_exists($klass, 'customName')) {
+                            $custom_name = $klass::customName($value);
+                        }
+                        if (!is_null($custom_name)) {
+                            $encoded = json_encode(
+                                $custom_name, JSON_UNESCAPED_UNICODE);
+                            $size += strlen($encoded);
+                        } else {
+                            $size += 2;  // size for ""
+                            $size += strlen($enum_value_desc->getName());
+                        }
                     } else {
                         $str_value = strval($value);
                         $size += strlen($str_value);
